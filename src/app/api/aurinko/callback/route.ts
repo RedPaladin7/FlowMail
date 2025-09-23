@@ -14,6 +14,7 @@ export const GET = async (req: NextRequest) =>{
     if(status != 'success') return NextResponse.json({message: 'Failed to link account'}, {status: 401})
     const code = params.get('code')
     if(!code) return NextResponse.json({message: 'Missing code'}, {status: 400})
+    console.log(code)
     
     const token = await exchangeCodeForAccessToken(code)
     if(!token) return NextResponse.json({message: 'Failed to exchange code for token'}, {status: 400})

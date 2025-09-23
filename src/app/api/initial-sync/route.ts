@@ -3,7 +3,8 @@ import { db } from "@/server/db";
 import { NextResponse, type NextRequest } from "next/server";
 
 export const POST = async (req: NextRequest) => {
-    const {accountId, userId} = await req.json()
+    const body = await req.json()
+    const {accountId, userId} = body
     if(!accountId || !userId) {
         return NextResponse.json({error: 'Missing account or user id'}, {status: 400})
     }
@@ -18,6 +19,21 @@ export const POST = async (req: NextRequest) => {
 
     const account = new Account(dbAccount.accessToken)
     
-    const emails = await performInitialSync()
-    await syncEmailsToDatabase(emails)
+    const response = await account.performInitialSync()
+    if(!response){
+        return NextResponse.json({error: 'Failed to perform initial sync'}, {status: 500})
+    }
+
+    const {emails, deltaToken} = response
+    console.log('emails', emails)
+    // await db.account.update({
+    //     where: {
+    //         id: accountId
+    //     },
+    //     data: {
+    //         nextDeltaToken:  deltaToken
+    //     }
+    // })
+    console.log('Sync completed')
+    return NextResponse.json({success: true}, {status: 200})
 }

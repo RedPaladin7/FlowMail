@@ -1,4 +1,4 @@
-import { type SyncUpdatedResponse, type SyncResponse } from "@/types"
+import { type SyncUpdatedResponse, type SyncResponse, type EmailMessage } from "@/types"
 import axios from "axios"
 
 export class Account {
@@ -12,9 +12,9 @@ export class Account {
         const response = await axios.post<SyncResponse>('https://api.aurinko.io/v1/email/sync', {}, {
             headers: {
                 'Authorization': `Bearer ${this.token}`
-            },
+            }, 
             params: {
-                daysWithin: 90,
+                daysWithin: 5,
                 bodyType: 'html'
             }
         })
@@ -32,6 +32,7 @@ export class Account {
             },
             params
         })
+        return response.data
     }
 
     async performInitialSync() {
@@ -43,8 +44,37 @@ export class Account {
             }
 
             let storedDeltaToken: string = syncResponse.syncUpdatedToken
+            let updatedResposne = await this.getUpdatedEmails({deltaToken: syncResponse.syncUpdatedToken})
+
+            if(updatedResposne.nextDeltaToken) {
+                // sync has completed
+                storedDeltaToken = updatedResposne.nextDeltaToken
+            }
+            let allEmails: EmailMessage[] = updatedResposne.records
+
+            // fetch the rest of the pages if there are more
+            while(updatedResposne.nextPageToken){
+                updatedResposne = await this.getUpdatedEmails({pageToken: updatedResposne.nextPageToken
+                })
+                allEmails = allEmails.concat(updatedResposne.records)
+                if(updatedResposne.nextDeltaToken){
+                    storedDeltaToken = updatedResposne.nextDeltaToken
+                }
+            }
+
+            console.log('Initial sync completed')
+            // store the latest delta token for future incremental syncs
+
+            return {
+                emails: allEmails,
+                deltaToken: storedDeltaToken
+            }
         } catch (error) {
-            
+            if(axios.isAxiosError(error)){
+                console.error('Error during sync: ', JSON.stringify(error.response?.data, null, 2))
+            } else {
+                console.error('Error during sync: ', error)
+            }
         }
     }
 }
